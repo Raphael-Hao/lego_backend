@@ -71,7 +71,7 @@ class BackendOutputResponder {
   void ProcessTensor(
       const std::string& name, const TRITONSERVER_DataType datatype,
       std::vector<int64_t>& batchn_shape, const char* buffer,
-      const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id);
+      const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id, const size_t& batch_dim = 0);
 
   // Process all responses for a batch output and derive its value from
   // 'buffer'.

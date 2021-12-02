@@ -50,7 +50,7 @@ void
 BackendOutputResponder::ProcessTensor(
     const std::string& output_name, const TRITONSERVER_DataType datatype,
     std::vector<int64_t>& batchn_shape, const char* buffer,
-    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id)
+    const TRITONSERVER_MemoryType memory_type, const int64_t memory_type_id, const size_t& batch_dim)
 {
   // A value of CPU_PINNED indicates that pinned memory buffer is not
   // needed for this tensor. Any other value indicates that a pinned
@@ -85,7 +85,7 @@ BackendOutputResponder::ProcessTensor(
       const int64_t* shape;
       TRITONBACKEND_InputProperties(
           input, nullptr, nullptr, &shape, nullptr, nullptr, nullptr);
-      batchn_shape[0] = shape[0];
+      batchn_shape[batch_dim] = shape[batch_dim];
     }
 
     const size_t tensor_byte_size = GetByteSize(datatype, batchn_shape);
