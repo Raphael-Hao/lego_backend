@@ -443,7 +443,7 @@ BackendInputCollector::SetInputTensor(
           TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INVALID_ARG,
               std::string(
-                  "unexpected total byte size " +
+                  "Unexpected total byte size " +
                   std::to_string(
                       tensor_buffer_offset + input.memory_desc_.byte_size_) +
                   " for input '" + input_name + "', expecting " +
