@@ -55,7 +55,7 @@ class BackendInputCollector {
   // valid for the lifetime of the collector
   explicit BackendInputCollector(
       TRITONBACKEND_Request** requests, const uint32_t request_count,
-      std::vector<TRITONBACKEND_Response*>* responses,
+      TRITONBACKEND_Response** responses,
       TRITONBACKEND_MemoryManager* memory_manager, const bool pinned_enabled,
       cudaStream_t stream, cudaEvent_t event = nullptr,
       cudaEvent_t buffer_ready_event = nullptr,
@@ -152,7 +152,7 @@ class BackendInputCollector {
    public:
     InputIterator(
         TRITONBACKEND_Request** requests, const uint32_t request_count,
-        std::vector<TRITONBACKEND_Response*>* responses, const char* input_name,
+        TRITONBACKEND_Response** responses, const char* input_name,
         const char* host_policy_name, const bool coalesce_request_input);
 
     // Return false if iterator reaches the end of inputs, 'input' is not set.
@@ -161,7 +161,7 @@ class BackendInputCollector {
    private:
     TRITONBACKEND_Request** requests_;
     const uint32_t request_count_;
-    std::vector<TRITONBACKEND_Response*>* responses_;
+    TRITONBACKEND_Response** responses_;
     const char* input_name_;
     const char* host_policy_;
     const bool coalesce_request_input_;
@@ -211,7 +211,7 @@ class BackendInputCollector {
   bool need_sync_;
   TRITONBACKEND_Request** requests_;
   const uint32_t request_count_;
-  std::vector<TRITONBACKEND_Response*>* responses_;
+  TRITONBACKEND_Response** responses_;
   TRITONBACKEND_MemoryManager* memory_manager_;
   const bool pinned_enabled_;
   const bool use_async_cpu_copy_;
@@ -247,7 +247,7 @@ class BackendInputCollector {
         const TRITONSERVER_MemoryType tensor_memory_type,
         const int64_t tensor_memory_id,
         std::list<ContiguousBuffer>&& request_buffers,
-        std::vector<TRITONBACKEND_Response*>* responses)
+        TRITONBACKEND_Response** responses)
         : finalized_(false), pinned_memory_(pinned_memory),
           pinned_memory_size_(pinned_memory_size),
           tensor_buffer_(tensor_buffer),
@@ -269,7 +269,7 @@ class BackendInputCollector {
     const TRITONSERVER_MemoryType tensor_memory_type_;
     const int64_t tensor_memory_id_;
     std::list<ContiguousBuffer> requests_;
-    std::vector<TRITONBACKEND_Response*>* responses_;
+    TRITONBACKEND_Response** responses_;
   };
 
   std::list<DeferredPinned> deferred_pinned_;

@@ -27,6 +27,7 @@
 #include "triton/backend/backend_input_collector.h"
 
 #include <atomic>
+
 #include "triton/backend/backend_common.h"
 #ifdef TRITON_ENABLE_GPU
 #include "kernel.h"
@@ -40,14 +41,14 @@ namespace triton { namespace backend {
 
 BackendInputCollector::InputIterator::InputIterator(
     TRITONBACKEND_Request** requests, const uint32_t request_count,
-    std::vector<TRITONBACKEND_Response*>* responses, const char* input_name,
+    TRITONBACKEND_Response** responses, const char* input_name,
     const char* host_policy_name, const bool coalesce_request_input)
     : requests_(requests), request_count_(request_count), responses_(responses),
       input_name_(input_name), host_policy_(host_policy_name),
       coalesce_request_input_(coalesce_request_input), curr_request_idx_(0),
       curr_buffer_idx_(0), reach_end_(false)
 {
-  auto& response = (*responses_)[curr_request_idx_];
+  auto& response = responses_[curr_request_idx_];
   RESPOND_AND_SET_NULL_IF_ERROR(
       &response, TRITONBACKEND_RequestInput(
                      requests_[curr_request_idx_], input_name_, &curr_input_));
@@ -78,7 +79,7 @@ BackendInputCollector::InputIterator::GetNextContiguousInput(
     if (curr_buffer_idx_ >= curr_buffer_cnt_) {
       ++curr_request_idx_;
       if (curr_request_idx_ < request_count_) {
-        auto& response = (*responses_)[curr_request_idx_];
+        auto& response = responses_[curr_request_idx_];
         RESPOND_AND_SET_NULL_IF_ERROR(
             &response,
             TRITONBACKEND_RequestInput(
@@ -117,7 +118,7 @@ BackendInputCollector::InputIterator::GetNextContiguousInput(
     // Iterated all buffers for current request, check next
     ++curr_request_idx_;
     if (curr_request_idx_ < request_count_) {
-      auto& response = (*responses_)[curr_request_idx_];
+      auto& response = responses_[curr_request_idx_];
       RESPOND_AND_SET_NULL_IF_ERROR(
           &response,
           TRITONBACKEND_RequestInput(
@@ -149,7 +150,7 @@ BackendInputCollector::GetInputBufferIfContiguous(
   bool contiguous = true;
   for (size_t idx = 0; idx < request_count_; idx++) {
     auto& request = requests_[idx];
-    auto& response = (*responses_)[idx];
+    auto& response = responses_[idx];
 
     TRITONBACKEND_Input* input;
     RESPOND_AND_SET_NULL_IF_ERROR(
@@ -292,12 +293,14 @@ BackendInputCollector::ProcessTensor(
       const int64_t memory_type_id = allowed_type.second;
       switch (allowed_type.first) {
         case TRITONSERVER_MEMORY_GPU:
-          alloc_types = {BackendMemory::AllocationType::GPU_POOL,
-                         BackendMemory::AllocationType::GPU};
+          alloc_types = {
+              BackendMemory::AllocationType::GPU_POOL,
+              BackendMemory::AllocationType::GPU};
           break;
         case TRITONSERVER_MEMORY_CPU_PINNED:
-          alloc_types = {BackendMemory::AllocationType::CPU_PINNED_POOL,
-                         BackendMemory::AllocationType::CPU_PINNED};
+          alloc_types = {
+              BackendMemory::AllocationType::CPU_PINNED_POOL,
+              BackendMemory::AllocationType::CPU_PINNED};
           break;
         case TRITONSERVER_MEMORY_CPU:
           alloc_types = {BackendMemory::AllocationType::CPU};
@@ -408,13 +411,13 @@ BackendInputCollector::DeferredPinned::Finalize(cudaStream_t stream)
     for (auto& pr : requests_) {
       for (size_t idx = pr.start_request_idx_; idx <= pr.end_request_idx_;
            ++idx) {
-        if ((*responses_)[idx] != nullptr) {
+        if (responses_[idx] != nullptr) {
           LOG_IF_ERROR(
               TRITONBACKEND_ResponseSend(
-                  (*responses_)[idx], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                  responses_[idx], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
                   err),
               "failed to send error response");
-          (*responses_)[idx] = nullptr;
+          responses_[idx] = nullptr;
         }
       }
     }
@@ -439,7 +442,7 @@ BackendInputCollector::SetInputTensor(
     for (size_t i = input.start_request_idx_; i <= input.end_request_idx_;
          ++i) {
       RESPOND_AND_SET_NULL_IF_ERROR(
-          &(*responses_)[i],
+          &responses_[i],
           TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INVALID_ARG,
               std::string(
@@ -524,7 +527,7 @@ BackendInputCollector::SetInputTensor(
     for (size_t i = input.start_request_idx_; i <= input.end_request_idx_;
          ++i) {
       RESPOND_AND_SET_NULL_IF_ERROR(
-          &(*responses_)[i],
+          &responses_[i],
           TRITONSERVER_ErrorNew(
               TRITONSERVER_ErrorCode(err), TRITONSERVER_ErrorMessage(err)));
     }
@@ -625,13 +628,13 @@ BackendInputCollector::FlushPendingPinned(
           for (auto& pr : pending_pinned_input_buffers_) {
             for (size_t idx = pr.start_request_idx_; idx <= pr.end_request_idx_;
                  ++idx) {
-              if ((*responses_)[idx] != nullptr) {
+              if (responses_[idx] != nullptr) {
                 LOG_IF_ERROR(
                     TRITONBACKEND_ResponseSend(
-                        (*responses_)[idx],
-                        TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
+                        responses_[idx], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                        err),
                     "failed to send error response");
-                (*responses_)[idx] = nullptr;
+                responses_[idx] = nullptr;
               }
             }
           }
@@ -702,13 +705,13 @@ BackendInputCollector::FlushPendingPinned(
           for (; pending_it != end_it; pending_it++) {
             for (size_t idx = pending_it->start_request_idx_;
                  idx <= pending_it->end_request_idx_; ++idx) {
-              if ((*responses_)[idx] != nullptr) {
+              if (responses_[idx] != nullptr) {
                 LOG_IF_ERROR(
                     TRITONBACKEND_ResponseSend(
-                        (*responses_)[idx],
-                        TRITONSERVER_RESPONSE_COMPLETE_FINAL, err),
+                        responses_[idx], TRITONSERVER_RESPONSE_COMPLETE_FINAL,
+                        err),
                     "failed to send error response");
-                (*responses_)[idx] = nullptr;
+                responses_[idx] = nullptr;
               }
             }
           }
@@ -804,12 +807,14 @@ BackendInputCollector::ProcessBatchInput(
       const int64_t memory_type_id = allowed_type.second;
       switch (allowed_type.first) {
         case TRITONSERVER_MEMORY_GPU:
-          alloc_types = {BackendMemory::AllocationType::GPU_POOL,
-                         BackendMemory::AllocationType::GPU};
+          alloc_types = {
+              BackendMemory::AllocationType::GPU_POOL,
+              BackendMemory::AllocationType::GPU};
           break;
         case TRITONSERVER_MEMORY_CPU_PINNED:
-          alloc_types = {BackendMemory::AllocationType::CPU_PINNED_POOL,
-                         BackendMemory::AllocationType::CPU_PINNED};
+          alloc_types = {
+              BackendMemory::AllocationType::CPU_PINNED_POOL,
+              BackendMemory::AllocationType::CPU_PINNED};
           break;
         case TRITONSERVER_MEMORY_CPU:
           alloc_types = {BackendMemory::AllocationType::CPU};
@@ -1082,12 +1087,14 @@ BackendInputCollector::LaunchCopyKernel(
   std::vector<BackendMemory::AllocationType> alloc_types;
   switch (tensor_memory_type) {
     case TRITONSERVER_MEMORY_GPU:
-      alloc_types = {BackendMemory::AllocationType::GPU_POOL,
-                     BackendMemory::AllocationType::GPU};
+      alloc_types = {
+          BackendMemory::AllocationType::GPU_POOL,
+          BackendMemory::AllocationType::GPU};
       break;
     case TRITONSERVER_MEMORY_CPU_PINNED:
-      alloc_types = {BackendMemory::AllocationType::CPU_PINNED_POOL,
-                     BackendMemory::AllocationType::CPU_PINNED};
+      alloc_types = {
+          BackendMemory::AllocationType::CPU_PINNED_POOL,
+          BackendMemory::AllocationType::CPU_PINNED};
       break;
     case TRITONSERVER_MEMORY_CPU:
       alloc_types = {BackendMemory::AllocationType::CPU};
